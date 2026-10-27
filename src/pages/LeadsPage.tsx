@@ -71,6 +71,10 @@ export const LeadsPage: React.FC<Props> = ({ onOpenLead }) => {
   }
 
   async function handleMoveLead(leadId: string, toStatus: string) {
+    const currentLead = leads.find(l => l.id === leadId);
+    if (currentLead && currentLead.status === toStatus) {
+      return;
+    }
     try {
       // Optimistic update
       setLeads(prev => prev.map(l => (l.id === leadId ? { ...l, status: toStatus } : l)));

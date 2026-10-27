@@ -103,6 +103,7 @@ export const KanbanBoard: React.FC<Props> = ({
 
   function handleDragOver(e: React.DragEvent, colKey: string) {
     e.preventDefault();
+    e.stopPropagation();
     if (dropTargetCol !== colKey) {
       setDropTargetCol(colKey);
     }
@@ -110,6 +111,7 @@ export const KanbanBoard: React.FC<Props> = ({
 
   function handleDrop(e: React.DragEvent, colKey: string) {
     e.preventDefault();
+    e.stopPropagation();
     const id = e.dataTransfer.getData('text/plain') || draggingId;
     if (id) {
       onMoveLead(id, colKey);

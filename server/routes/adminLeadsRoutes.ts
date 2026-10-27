@@ -205,10 +205,16 @@ adminLeadsRouter.patch('/leads/:id/status', async (req: AuthenticatedRequest, re
   try {
     const leadId = req.params.id as string;
     const { status } = req.body;
-    const allowed = ['new', 'in_progress', 'won', 'lost'];
+    const allowed = ['new', 'in_progress', 'negotiation', 'won', 'lost'];
 
-    if (!status || !allowed.includes(status)) {
-      res.status(400).json({ error: 'Недопустимый статус. Разрешены: new, in_progress, won, lost' });
+    if (!status || typeof status !== 'string' || status.trim().length === 0) {
+      res.status(400).json({ error: 'Укажите корректный статус заявки' });
+      return;
+    }
+
+    const normalizedStatus = status.trim();
+    if (!allowed.includes(normalizedStatus) && normalizedStatus.length > 64) {
+      res.status(400).json({ error: 'Недопустимый статус' });
       return;
     }
 
@@ -218,7 +224,7 @@ adminLeadsRouter.patch('/leads/:id/status', async (req: AuthenticatedRequest, re
       return;
     }
 
-    const updated = await leadsRepository.updateStatus(leadId, status);
+    const updated = await leadsRepository.updateStatus(leadId, normalizedStatus);
 
     await auditRepository.log('status_change', {
       userId: req.user?.userId,
@@ -226,7 +232,7 @@ adminLeadsRouter.patch('/leads/:id/status', async (req: AuthenticatedRequest, re
       details: {
         lead_id: leadId,
         old_status: current.status,
-        new_status: status
+        new_status: normalizedStatus
       }
     });
 
