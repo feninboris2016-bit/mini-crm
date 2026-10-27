@@ -23,9 +23,10 @@ RUN npm ci --only=production
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/dist-server ./dist-server
 COPY --from=builder /app/server/db/schema.sql ./server/db/schema.sql
+COPY --from=builder /app/server/db/schema.sql ./dist-server/db/schema.sql
 
-# Create persistent data directory
-RUN mkdir -p /app/data /app/data/backups
+# Create persistent data directory with full access
+RUN mkdir -p /app/data /app/data/backups /tmp && chmod -R 777 /app/data /tmp
 
 EXPOSE 3000
 

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import pg from 'pg';
 import dotenv from 'dotenv';
 
@@ -26,17 +27,37 @@ if (rawDbUrl.startsWith('postgres://') || rawDbUrl.startsWith('postgresql://')) 
     idleTimeoutMillis: 30000
   });
 } else {
-  // Use built-in node:sqlite
+  // Use built-in node:sqlite with resilient path fallback
   const { DatabaseSync } = (await import('node:sqlite')) as any;
-  const dbDir = path.resolve(process.cwd(), 'data');
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
+  let dbFile = rawDbUrl.replace(/^sqlite:/, '').trim();
+
+  if (!dbFile) {
+    const dbDir = path.resolve(process.cwd(), 'data');
+    try {
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true, mode: 0o777 });
+      }
+      dbFile = path.join(dbDir, 'crm.sqlite');
+    } catch {
+      dbFile = path.join(os.tmpdir(), 'crm.sqlite');
+    }
   }
-  const dbFile = rawDbUrl.replace(/^sqlite:/, '') || path.join(dbDir, 'crm.sqlite');
-  sqliteDb = new DatabaseSync(dbFile);
-  // Enable foreign keys, WAL mode, and busy timeout for smooth concurrency
-  sqliteDb.exec('PRAGMA foreign_keys = ON;');
+
   try {
+    const targetDir = path.dirname(dbFile);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true, mode: 0o777 });
+    }
+    sqliteDb = new DatabaseSync(dbFile);
+  } catch (openErr) {
+    console.warn(`[SQLite] Cannot open ${dbFile}, falling back to OS tempdir:`, openErr);
+    const tmpFallback = path.join(os.tmpdir(), 'crm.sqlite');
+    sqliteDb = new DatabaseSync(tmpFallback);
+  }
+
+  // Enable foreign keys, WAL mode, and busy timeout for smooth concurrency
+  try {
+    sqliteDb.exec('PRAGMA foreign_keys = ON;');
     sqliteDb.exec('PRAGMA journal_mode = WAL;');
     sqliteDb.exec('PRAGMA busy_timeout = 5000;');
   } catch {}
@@ -128,7 +149,10 @@ export async function transaction<T>(callback: (client: DbClient) => Promise<T>)
 }
 
 export async function initDatabase(): Promise<void> {
-  const schemaPath = path.resolve(process.cwd(), 'server', 'db', 'schema.sql');
+  let schemaPath = path.resolve(process.cwd(), 'server', 'db', 'schema.sql');
+  if (!fs.existsSync(schemaPath)) {
+    schemaPath = path.resolve(process.cwd(), 'dist-server', 'db', 'schema.sql');
+  }
   const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
 
   if (isPostgres && pgPool) {
