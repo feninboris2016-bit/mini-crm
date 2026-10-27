@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Таблица лидов (заявок с сайта)
+-- 2. Таблица лидов (заявок с сайта и CRM)
 CREATE TABLE IF NOT EXISTS leads (
   id VARCHAR(64) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
@@ -21,6 +21,11 @@ CREATE TABLE IF NOT EXISTS leads (
   source_url VARCHAR(1024),
   source_name VARCHAR(255),
   status VARCHAR(32) NOT NULL DEFAULT 'new',
+  amount NUMERIC NOT NULL DEFAULT 0,
+  temperature VARCHAR(32) NOT NULL DEFAULT 'cold',
+  manager VARCHAR(255) NOT NULL DEFAULT '',
+  next_call_at TIMESTAMP,
+  call_status VARCHAR(32) NOT NULL DEFAULT 'none',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   notification_state VARCHAR(32) NOT NULL DEFAULT 'pending',
@@ -29,6 +34,8 @@ CREATE TABLE IF NOT EXISTS leads (
 
 CREATE INDEX IF NOT EXISTS idx_leads_created_at ON leads(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status);
+CREATE INDEX IF NOT EXISTS idx_leads_temperature ON leads(temperature);
+CREATE INDEX IF NOT EXISTS idx_leads_manager ON leads(manager);
 CREATE INDEX IF NOT EXISTS idx_leads_idempotency ON leads(external_idempotency_key);
 
 -- 3. Таблица внутренних заметок и комментариев сотрудников

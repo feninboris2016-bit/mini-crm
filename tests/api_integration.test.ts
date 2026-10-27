@@ -199,4 +199,68 @@ describe('HTTP API End-to-End Integration Tests', () => {
     expect(backupData.success).toBe(true);
     expect(backupData.backup.filename).toMatch(/^backup-.*\.json$/);
   });
+
+  it('11. Chatium CRM API: ручное создание лида, обновление температуры, суммы сделки и удаление', async () => {
+    // 1. Create lead manually
+    const createRes = await fetch(`${baseUrl}/api/v1/admin/leads`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        name: 'Ручной клиент Chatium API',
+        phone: '+79991112233',
+        amount: 250000,
+        temperature: 'good',
+        manager: 'Алексей',
+        status: 'negotiation'
+      })
+    });
+
+    expect(createRes.status).toBe(201);
+    const createData = await createRes.json();
+    expect(createData.lead.name).toBe('Ручной клиент Chatium API');
+    expect(createData.lead.amount).toBe(250000);
+    expect(createData.lead.temperature).toBe('good');
+    expect(createData.lead.status).toBe('negotiation');
+
+    const leadId = createData.lead.id;
+
+    // 2. Patch lead fields
+    const patchRes = await fetch(`${baseUrl}/api/v1/admin/leads/${leadId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        temperature: 'attention',
+        amount: 300000,
+        call_status: 'callback'
+      })
+    });
+
+    expect(patchRes.status).toBe(200);
+    const patchData = await patchRes.json();
+    expect(patchData.lead.temperature).toBe('attention');
+    expect(patchData.lead.amount).toBe(300000);
+    expect(patchData.lead.call_status).toBe('callback');
+
+    // 3. Stats check
+    const statsRes = await fetch(`${baseUrl}/api/v1/admin/leads/stats`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    const statsData = await statsRes.json();
+    expect(statsData.stats.total_amount).toBeGreaterThanOrEqual(300000);
+
+    // 4. Delete lead
+    const deleteRes = await fetch(`${baseUrl}/api/v1/admin/leads/${leadId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    expect(deleteRes.status).toBe(200);
+    const deleteData = await deleteRes.json();
+    expect(deleteData.success).toBe(true);
+  });
 });

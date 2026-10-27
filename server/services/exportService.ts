@@ -22,10 +22,20 @@ export const exportService = {
     return escaped;
   },
 
+  getTemperatureLabel(temperature: string): string {
+    switch (temperature) {
+      case 'cold': return 'Холодный';
+      case 'attention': return 'Внимание';
+      case 'good': return 'Хорошо';
+      default: return temperature || 'Холодный';
+    }
+  },
+
   getStatusLabel(status: string): string {
     switch (status) {
       case 'new': return 'Новая';
       case 'in_progress': return 'В работе';
+      case 'negotiation': return 'Переговоры';
       case 'won': return 'Успешно';
       case 'lost': return 'Отказ';
       default: return status;
@@ -54,12 +64,17 @@ export const exportService = {
       'ID заявки',
       'Дата и время',
       'Статус',
+      'Сумма (₽)',
+      'Температура',
+      'Ответственный менеджер',
       'Имя клиента',
       'Телефон',
       'Email',
       'Сообщение / пожелания',
       'Название источника',
       'URL страницы',
+      'Следующий контакт (перезвон)',
+      'Статус звонка',
       'Статус уведомлений'
     ];
 
@@ -71,12 +86,17 @@ export const exportService = {
         lead.id,
         new Date(lead.created_at).toLocaleString('ru-RU'),
         this.getStatusLabel(lead.status),
+        lead.amount || 0,
+        this.getTemperatureLabel(lead.temperature),
+        lead.manager || '',
         lead.name,
         lead.phone || '',
         lead.email || '',
         lead.message || '',
         lead.source_name || '',
         lead.source_url || '',
+        lead.next_call_at ? new Date(lead.next_call_at).toLocaleString('ru-RU') : '',
+        lead.call_status || 'none',
         this.getNotificationLabel(lead.notification_state)
       ];
       rows.push(row.map(c => this.sanitizeForCsv(c)).join(';'));

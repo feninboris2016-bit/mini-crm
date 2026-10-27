@@ -19,8 +19,8 @@ export const Navbar: React.FC<Props> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navItems = [
-    { id: 'dashboard', label: '📊 Обзор' },
-    { id: 'leads', label: '👥 Заявки' },
+    { id: 'leads', label: '📋 Воронка (Канбан)' },
+    { id: 'dashboard', label: '📊 Показатели' },
     { id: 'settings', label: '⚙️ Настройки' },
     { id: 'audit', label: '📜 Журнал аудита' }
   ];

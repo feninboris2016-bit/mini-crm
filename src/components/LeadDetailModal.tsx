@@ -8,16 +8,32 @@ interface Props {
   leadId: string | null;
   onClose: () => void;
   onLeadUpdated: () => void;
+  onLeadDeleted?: () => void;
+  managersList?: string[];
 }
 
-export const LeadDetailModal: React.FC<Props> = ({ leadId, onClose, onLeadUpdated }) => {
+export const LeadDetailModal: React.FC<Props> = ({
+  leadId,
+  onClose,
+  onLeadUpdated,
+  onLeadDeleted,
+  managersList = ['Алексей', 'Дмитрий', 'Мария', 'Елена', 'Иван']
+}) => {
   const [data, setData] = useState<LeadDetailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newComment, setNewComment] = useState('');
   const [commentSubmitting, setCommentSubmitting] = useState(false);
   const [copiedField, setCopiedField] = useState('');
-  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
+  // Editable fields state
+  const [amount, setAmount] = useState<number>(0);
+  const [temperature, setTemperature] = useState<string>('cold');
+  const [manager, setManager] = useState<string>('');
+  const [nextCallAt, setNextCallAt] = useState<string>('');
+  const [callStatus, setCallStatus] = useState<string>('none');
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
     if (!leadId) return;
@@ -31,6 +47,11 @@ export const LeadDetailModal: React.FC<Props> = ({ leadId, onClose, onLeadUpdate
       setError('');
       const res = await api.getLeadDetails(leadId);
       setData(res);
+      setAmount(res.lead.amount || 0);
+      setTemperature(res.lead.temperature || 'cold');
+      setManager(res.lead.manager || '');
+      setNextCallAt(res.lead.next_call_at ? res.lead.next_call_at.slice(0, 16) : '');
+      setCallStatus(res.lead.call_status || 'none');
     } catch (err: any) {
       setError(err.message || 'Не удалось загрузить карточку лида');
     } finally {
@@ -41,7 +62,7 @@ export const LeadDetailModal: React.FC<Props> = ({ leadId, onClose, onLeadUpdate
   async function handleStatusChange(newStatus: string) {
     if (!data) return;
     try {
-      setStatusUpdating(true);
+      setUpdating(true);
       await api.updateLeadStatus(data.lead.id, newStatus);
       setData({
         ...data,
@@ -51,7 +72,51 @@ export const LeadDetailModal: React.FC<Props> = ({ leadId, onClose, onLeadUpdate
     } catch (err: any) {
       alert(`Ошибка обновления статуса: ${err.message}`);
     } finally {
-      setStatusUpdating(false);
+      setUpdating(false);
+    }
+  }
+
+  async function handleSaveDealFields() {
+    if (!data) return;
+    try {
+      setUpdating(true);
+      const res = await api.updateLead(data.lead.id, {
+        amount: Number(amount) || 0,
+        temperature,
+        manager,
+        next_call_at: nextCallAt ? new Date(nextCallAt).toISOString() : null,
+        call_status: callStatus
+      });
+      setData({
+        ...data,
+        lead: res.lead
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
+      onLeadUpdated();
+    } catch (err: any) {
+      alert(`Ошибка сохранения: ${err.message}`);
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleDeleteLead() {
+    if (!data) return;
+    if (!window.confirm(`Вы действительно хотите удалить заявку #${data.lead.id}? Это действие необратимо.`)) {
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await api.deleteLead(data.lead.id);
+      onClose();
+      if (onLeadDeleted) onLeadDeleted();
+      else onLeadUpdated();
+    } catch (err: any) {
+      alert(`Ошибка удаления: ${err.message}`);
+    } finally {
+      setUpdating(false);
     }
   }
 
@@ -91,18 +156,43 @@ export const LeadDetailModal: React.FC<Props> = ({ leadId, onClose, onLeadUpdate
     setTimeout(() => setCopiedField(''), 2000);
   }
 
+  function quickScheduleHours(hours: number) {
+    const d = new Date(Date.now() + hours * 3600 * 1000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const str = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    setNextCallAt(str);
+    setCallStatus('callback');
+  }
+
   if (!leadId) return null;
 
   return (
     <div className="crm-modal-overlay" onClick={onClose}>
-      <div className="crm-modal-content" onClick={e => e.stopPropagation()}>
+      <div className="crm-modal-content" style={{ maxWidth: '840px' }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="crm-modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <h2 className="crm-modal-title">
               Заявка #{leadId.replace('lead_', '').slice(0, 8).toUpperCase()}
             </h2>
             {data && <StatusBadge status={data.lead.status} />}
+
+            {/* Temperature Badge */}
+            {temperature === 'attention' && (
+              <span style={{ fontSize: '12px', background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
+                ⚠️ Требует внимания
+              </span>
+            )}
+            {temperature === 'good' && (
+              <span style={{ fontSize: '12px', background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
+                🌟 Тёплый лид
+              </span>
+            )}
+            {temperature === 'cold' && (
+              <span style={{ fontSize: '12px', background: 'rgba(14, 165, 233, 0.2)', color: '#38bdf8', padding: '2px 8px', borderRadius: '9999px', fontWeight: 600 }}>
+                ❄️ Холодный
+              </span>
+            )}
           </div>
           <button className="crm-modal-close" onClick={onClose} aria-label="Закрыть">
             ✕
@@ -110,7 +200,7 @@ export const LeadDetailModal: React.FC<Props> = ({ leadId, onClose, onLeadUpdate
         </div>
 
         {/* Body */}
-        <div className="crm-modal-body">
+        <div className="crm-modal-body" style={{ maxHeight: 'calc(88vh - 120px)', overflowY: 'auto' }}>
           {loading && <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>Загрузка данных...</div>}
 
           {error && <div className="crm-alert crm-alert--danger">{error}</div>}
@@ -118,21 +208,161 @@ export const LeadDetailModal: React.FC<Props> = ({ leadId, onClose, onLeadUpdate
           {data && (
             <div className="crm-lead-details">
               {/* Quick Status Control Bar */}
-              <div className="crm-status-bar">
-                <span style={{ fontSize: '13px', color: 'var(--crm-muted)', fontWeight: 500 }}>
-                  Изменить статус:
-                </span>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {(['new', 'in_progress', 'won', 'lost'] as const).map(st => (
-                    <button
-                      key={st}
-                      className={`crm-status-btn ${data.lead.status === st ? 'crm-status-btn--active' : ''}`}
-                      disabled={statusUpdating}
-                      onClick={() => handleStatusChange(st)}
+              <div className="crm-status-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '13px', color: 'var(--crm-muted)', fontWeight: 500 }}>
+                    Этап воронки:
+                  </span>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {[
+                      { key: 'new', label: '🆕 Новый' },
+                      { key: 'in_progress', label: '⚙️ В работе' },
+                      { key: 'negotiation', label: '🤝 Переговоры' },
+                      { key: 'won', label: '🎉 Успешно' },
+                      { key: 'lost', label: '❌ Отказ' }
+                    ].map(st => (
+                      <button
+                        key={st.key}
+                        className={`crm-status-btn ${data.lead.status === st.key ? 'crm-status-btn--active' : ''}`}
+                        disabled={updating}
+                        onClick={() => handleStatusChange(st.key)}
+                      >
+                        <span style={{ fontSize: '12px', fontWeight: 600 }}>{st.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Direct Phone Call Button */}
+                {data.lead.phone && (
+                  <a
+                    href={`tel:${data.lead.phone}`}
+                    className="crm-btn crm-btn--accent crm-btn--sm"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    📞 Позвонить
+                  </a>
+                )}
+              </div>
+
+              {/* Deal Parameters & Follow-up Card */}
+              <div
+                className="crm-card"
+                style={{
+                  marginBottom: '16px',
+                  backgroundColor: 'rgba(31, 41, 55, 0.5)',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                  padding: '16px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 className="crm-card__title" style={{ margin: 0, color: '#c7d2fe' }}>
+                    Параметры сделки и коммуникация
+                  </h3>
+                  {saveSuccess && (
+                    <span style={{ color: '#4ade80', fontSize: '12px', fontWeight: 600 }}>
+                      ✓ Изменения сохранены
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                  {/* Amount / Budget */}
+                  <div>
+                    <label className="crm-label" style={{ fontSize: '12px' }}>Бюджет / Сумма сделки (₽)</label>
+                    <input
+                      type="number"
+                      className="crm-input"
+                      value={amount}
+                      onChange={e => setAmount(Number(e.target.value) || 0)}
+                      placeholder="0"
+                    />
+                  </div>
+
+                  {/* Temperature */}
+                  <div>
+                    <label className="crm-label" style={{ fontSize: '12px' }}>Температура лида</label>
+                    <select
+                      className="crm-select"
+                      value={temperature}
+                      onChange={e => setTemperature(e.target.value)}
                     >
-                      <StatusBadge status={st} size="sm" />
+                      <option value="cold">❄️ Холодный</option>
+                      <option value="attention">⚠️ Требует внимания</option>
+                      <option value="good">🌟 Тёплый / Готов покупать</option>
+                    </select>
+                  </div>
+
+                  {/* Responsible Manager */}
+                  <div>
+                    <label className="crm-label" style={{ fontSize: '12px' }}>Ответственный менеджер</label>
+                    <select
+                      className="crm-select"
+                      value={manager}
+                      onChange={e => setManager(e.target.value)}
+                    >
+                      <option value="">Без назначения</option>
+                      {managersList.map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Call Status */}
+                  <div>
+                    <label className="crm-label" style={{ fontSize: '12px' }}>Статус звонка</label>
+                    <select
+                      className="crm-select"
+                      value={callStatus}
+                      onChange={e => setCallStatus(e.target.value)}
+                    >
+                      <option value="none">Не звонили</option>
+                      <option value="queued">В очереди на обзвон</option>
+                      <option value="calling">Идёт вызов</option>
+                      <option value="reached">Дозвонились</option>
+                      <option value="noanswer">Не дозвонились</option>
+                      <option value="callback">Нужен перезвон</option>
+                      <option value="failed">Ошибка связи</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Scheduled Callback */}
+                <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 220px' }}>
+                    <label className="crm-label" style={{ fontSize: '12px' }}>Следующий контакт (дата и время)</label>
+                    <input
+                      type="datetime-local"
+                      className="crm-input"
+                      value={nextCallAt}
+                      onChange={e => setNextCallAt(e.target.value)}
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-end', marginTop: '18px' }}>
+                    <button
+                      type="button"
+                      className="crm-btn crm-btn--xs crm-btn--secondary"
+                      onClick={() => quickScheduleHours(2)}
+                    >
+                      +2 часа
                     </button>
-                  ))}
+                    <button
+                      type="button"
+                      className="crm-btn crm-btn--xs crm-btn--secondary"
+                      onClick={() => quickScheduleHours(24)}
+                    >
+                      Завтра
+                    </button>
+                    <button
+                      type="button"
+                      className="crm-btn crm-btn--sm crm-btn--accent"
+                      onClick={handleSaveDealFields}
+                      disabled={updating}
+                    >
+                      {updating ? 'Сохранение...' : '💾 Сохранить параметры'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -217,9 +447,9 @@ export const LeadDetailModal: React.FC<Props> = ({ leadId, onClose, onLeadUpdate
 
                   {/* Message */}
                   <div className="crm-card" style={{ marginBottom: '16px' }}>
-                    <h3 className="crm-card__title">Содержание заявки</h3>
+                    <h3 className="crm-card__title">Содержание заявки / Запрос</h3>
                     {data.lead.message ? (
-                      <div className="crm-lead-message">
+                      <div className="crm-lead-message" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
                         {data.lead.message}
                       </div>
                     ) : (
@@ -227,6 +457,19 @@ export const LeadDetailModal: React.FC<Props> = ({ leadId, onClose, onLeadUpdate
                         Клиент не оставил дополнительного комментария.
                       </div>
                     )}
+                  </div>
+
+                  {/* Delete Card */}
+                  <div style={{ textAlign: 'right' }}>
+                    <button
+                      type="button"
+                      className="crm-btn crm-btn--ghost"
+                      style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                      onClick={handleDeleteLead}
+                      disabled={updating}
+                    >
+                      🗑️ Удалить карточку лида
+                    </button>
                   </div>
                 </div>
 

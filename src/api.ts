@@ -98,6 +98,9 @@ export const api = {
     limit?: number;
     search?: string;
     status?: string;
+    temperature?: string;
+    manager?: string;
+    source?: string;
     dateFrom?: string;
     dateTo?: string;
     sortBy?: string;
@@ -111,6 +114,9 @@ export const api = {
     if (params.limit) searchParams.set('limit', String(params.limit));
     if (params.search) searchParams.set('search', params.search);
     if (params.status && params.status !== 'all') searchParams.set('status', params.status);
+    if (params.temperature && params.temperature !== 'all') searchParams.set('temperature', params.temperature);
+    if (params.manager && params.manager !== 'all') searchParams.set('manager', params.manager);
+    if (params.source && params.source !== 'all') searchParams.set('source', params.source);
     if (params.dateFrom) searchParams.set('dateFrom', params.dateFrom);
     if (params.dateTo) searchParams.set('dateTo', params.dateTo);
     if (params.sortBy) searchParams.set('sortBy', params.sortBy);
@@ -118,6 +124,26 @@ export const api = {
 
     const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
     return request(`/admin/leads${query}`);
+  },
+
+  async createLead(leadData: Partial<Lead>): Promise<{ success: boolean; lead: Lead }> {
+    return request('/admin/leads', {
+      method: 'POST',
+      body: JSON.stringify(leadData)
+    });
+  },
+
+  async updateLead(id: string, patchData: Partial<Lead>): Promise<{ success: boolean; lead: Lead }> {
+    return request(`/admin/leads/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patchData)
+    });
+  },
+
+  async deleteLead(id: string): Promise<{ success: boolean; message: string }> {
+    return request(`/admin/leads/${id}`, {
+      method: 'DELETE'
+    });
   },
 
   async getLeadDetails(id: string): Promise<LeadDetailsResponse> {

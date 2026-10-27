@@ -232,7 +232,7 @@ describe('Мини-CRM Комплексный набор тестов', () => {
       const csv = await exportService.generateLeadsCsv();
       // UTF-8 BOM check
       expect(csv.charCodeAt(0)).toBe(0xFEFF);
-      expect(csv).toContain('ID заявки;Дата и время;Статус;Имя клиента');
+      expect(csv).toContain('ID заявки;Дата и время;Статус;Сумма (₽);Температура;Ответственный менеджер;Имя клиента');
     });
   });
 
@@ -243,7 +243,48 @@ describe('Мини-CRM Комплексный набор тестов', () => {
       expect(backup.sizeBytes).toBeGreaterThan(0);
 
       const restoreResult = await backupService.restoreBackup(backup.filename, 'test_runner');
-      expect(restoreResult.restoredLeads).toBeGreaterThanOrEqual(0);
+      expect(restoreResult.restoredLeads).toBeGreaterThan(0);
+    });
+  });
+
+  describe('7. Функции Chatium CRM: воронка, температура, сумма сделки, менеджер и удаление', () => {
+    it('должен поддерживать создание лида с суммой сделки, температурой и ответственным', async () => {
+      const lead = await leadsRepository.create({
+        name: 'Ручной клиент Chatium',
+        phone: '+79998887766',
+        amount: 150000,
+        temperature: 'good',
+        manager: 'Алексей Менеджер',
+        status: 'in_progress'
+      });
+
+      expect(lead.id).toBeDefined();
+      expect(lead.amount).toBe(150000);
+      expect(lead.temperature).toBe('good');
+      expect(lead.manager).toBe('Алексей Менеджер');
+      expect(lead.status).toBe('in_progress');
+
+      // Update fields
+      const updated = await leadsRepository.updateLead(lead.id, {
+        temperature: 'attention',
+        amount: 200000,
+        manager: 'Дмитрий'
+      });
+
+      expect(updated?.temperature).toBe('attention');
+      expect(updated?.amount).toBe(200000);
+      expect(updated?.manager).toBe('Дмитрий');
+
+      // Check stats aggregation
+      const stats = await leadsRepository.getStats();
+      expect(stats.total_amount).toBeGreaterThanOrEqual(200000);
+      expect(stats.by_temperature.attention).toBeGreaterThanOrEqual(1);
+
+      // Clean up / Delete lead
+      const deleted = await leadsRepository.delete(lead.id);
+      expect(deleted).toBe(true);
+      const afterDelete = await leadsRepository.findById(lead.id);
+      expect(afterDelete).toBeNull();
     });
   });
 });

@@ -19,6 +19,12 @@ export const StatusBadge: React.FC<Props> = ({ status, size = 'md' }) => {
       color: '#fbbf24',
       border: 'rgba(245, 158, 11, 0.3)'
     },
+    negotiation: {
+      label: 'Переговоры',
+      bg: 'rgba(168, 85, 247, 0.15)',
+      color: '#c084fc',
+      border: 'rgba(168, 85, 247, 0.3)'
+    },
     won: {
       label: 'Успешно',
       bg: 'rgba(34, 197, 94, 0.15)',

@@ -6,7 +6,12 @@ export interface Lead {
   message: string | null;
   source_url: string | null;
   source_name: string | null;
-  status: 'new' | 'in_progress' | 'won' | 'lost';
+  status: 'new' | 'in_progress' | 'negotiation' | 'won' | 'lost' | string;
+  amount: number;
+  temperature: 'cold' | 'attention' | 'good' | string;
+  manager: string;
+  next_call_at: string | null;
+  call_status: 'none' | 'queued' | 'calling' | 'reached' | 'noanswer' | 'callback' | 'failed' | string;
   created_at: string;
   updated_at: string;
   notification_state: 'pending' | 'sent' | 'partial' | 'failed';
@@ -47,8 +52,13 @@ export interface DashboardStats {
     total: number;
     new: number;
     in_progress: number;
+    negotiation: number;
     won: number;
     lost: number;
+    total_amount: number;
+    won_amount: number;
+    by_column_amounts?: Record<string, number>;
+    by_temperature?: Record<string, number>;
   };
   queue: {
     pending: number;

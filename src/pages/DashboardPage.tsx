@@ -36,29 +36,60 @@ export const DashboardPage: React.FC<Props> = ({ onOpenLead, onNavigateTab }) =>
     return <div className="crm-page-container" style={{ textAlign: 'center', padding: '60px' }}>Загрузка показателей...</div>;
   }
 
-  const stats = data?.stats || { total: 0, new: 0, in_progress: 0, won: 0, lost: 0 };
+  const stats = data?.stats || { total: 0, new: 0, in_progress: 0, negotiation: 0, won: 0, lost: 0, total_amount: 0, won_amount: 0 };
   const queue = data?.queue || { pending: 0, processing: 0, sent: 0, retry: 0, failed: 0, total: 0 };
   const recent = data?.recent || [];
+
+  function formatMoney(amount: number): string {
+    return new Intl.NumberFormat('ru-RU').format(amount) + ' ₽';
+  }
 
   return (
     <div className="crm-page-container">
       {/* Page Title */}
       <div className="crm-page-header">
         <div>
-          <h1 className="crm-page-title">Сводка и показатели</h1>
-          <p className="crm-page-subtitle">Обзор поступающих заявок с подключенного сайта</p>
+          <h1 className="crm-page-title">Сводка и показатели воронки</h1>
+          <p className="crm-page-subtitle">Обзор поступающих заявок, объёма сделок и качества обработки</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="crm-btn crm-btn--sm crm-btn--secondary" onClick={loadStats}>
             🔄 Обновить
           </button>
           <button className="crm-btn crm-btn--sm crm-btn--accent" onClick={() => onNavigateTab('leads')}>
-            Все заявки →
+            Канбан-воронка →
           </button>
         </div>
       </div>
 
       {error && <div className="crm-alert crm-alert--danger" style={{ marginBottom: '20px' }}>{error}</div>}
+
+      {/* Financial Pipeline Overview */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+        <div className="crm-card" style={{ padding: '16px 20px', borderLeft: '4px solid #6366f1' }}>
+          <div className="crm-stat-card__label" style={{ color: '#818cf8' }}>Общий объём воронки</div>
+          <div className="crm-stat-card__value" style={{ color: '#f3f4f6', fontSize: '24px' }}>
+            {formatMoney(stats.total_amount || 0)}
+          </div>
+          <div className="crm-stat-card__hint">Сумма всех активных и закрытых сделок</div>
+        </div>
+
+        <div className="crm-card" style={{ padding: '16px 20px', borderLeft: '4px solid #22c55e' }}>
+          <div className="crm-stat-card__label" style={{ color: '#4ade80' }}>Выиграно / Оплачено</div>
+          <div className="crm-stat-card__value" style={{ color: '#4ade80', fontSize: '24px' }}>
+            {formatMoney(stats.won_amount || 0)}
+          </div>
+          <div className="crm-stat-card__hint">Успешно закрытые сделки</div>
+        </div>
+
+        <div className="crm-card" style={{ padding: '16px 20px', borderLeft: '4px solid #ef4444' }}>
+          <div className="crm-stat-card__label" style={{ color: '#f87171' }}>Требуют внимания</div>
+          <div className="crm-stat-card__value" style={{ color: '#f87171', fontSize: '24px' }}>
+            {stats.by_temperature?.attention || 0}
+          </div>
+          <div className="crm-stat-card__hint">Лиды без движения или с перезвоном</div>
+        </div>
+      </div>
 
       {/* Metrics Row */}
       <div className="crm-stats-grid">
@@ -77,7 +108,13 @@ export const DashboardPage: React.FC<Props> = ({ onOpenLead, onNavigateTab }) =>
         <div className="crm-stat-card" onClick={() => onNavigateTab('leads')}>
           <div className="crm-stat-card__label" style={{ color: '#fbbf24' }}>В работе</div>
           <div className="crm-stat-card__value" style={{ color: '#fbbf24' }}>{stats.in_progress}</div>
-          <div className="crm-stat-card__hint">Ведутся переговоры</div>
+          <div className="crm-stat-card__hint">Уточнение требований</div>
+        </div>
+
+        <div className="crm-stat-card" onClick={() => onNavigateTab('leads')}>
+          <div className="crm-stat-card__label" style={{ color: '#c084fc' }}>Переговоры</div>
+          <div className="crm-stat-card__value" style={{ color: '#c084fc' }}>{stats.negotiation || 0}</div>
+          <div className="crm-stat-card__hint">Согласование условий / счёт</div>
         </div>
 
         <div className="crm-stat-card" onClick={() => onNavigateTab('leads')}>

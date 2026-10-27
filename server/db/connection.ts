@@ -132,9 +132,36 @@ export async function initDatabase(): Promise<void> {
   const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
 
   if (isPostgres && pgPool) {
-    await pgPool.query(schemaSql);
+    // Run schema
+    try { await pgPool.query(schemaSql); } catch {}
+    // Ensure new columns exist for existing tables
+    const alterQueries = [
+      'ALTER TABLE leads ADD COLUMN IF NOT EXISTS amount NUMERIC NOT NULL DEFAULT 0;',
+      "ALTER TABLE leads ADD COLUMN IF NOT EXISTS temperature VARCHAR(32) NOT NULL DEFAULT 'cold';",
+      "ALTER TABLE leads ADD COLUMN IF NOT EXISTS manager VARCHAR(255) NOT NULL DEFAULT '';",
+      'ALTER TABLE leads ADD COLUMN IF NOT EXISTS next_call_at TIMESTAMP;',
+      "ALTER TABLE leads ADD COLUMN IF NOT EXISTS call_status VARCHAR(32) NOT NULL DEFAULT 'none';"
+    ];
+    for (const q of alterQueries) {
+      try { await pgPool.query(q); } catch {}
+    }
   } else {
-    // For SQLite, execute line-by-line or statement-by-statement
+    // Safely add columns first if table exists
+    const alterColumns = [
+      'ALTER TABLE leads ADD COLUMN amount NUMERIC NOT NULL DEFAULT 0',
+      "ALTER TABLE leads ADD COLUMN temperature VARCHAR(32) NOT NULL DEFAULT 'cold'",
+      "ALTER TABLE leads ADD COLUMN manager VARCHAR(255) NOT NULL DEFAULT ''",
+      'ALTER TABLE leads ADD COLUMN next_call_at TEXT',
+      "ALTER TABLE leads ADD COLUMN call_status VARCHAR(32) NOT NULL DEFAULT 'none'"
+    ];
+    for (const q of alterColumns) {
+      try {
+        sqliteDb.exec(q);
+      } catch (e: any) {
+        // Ignored if column already exists or table doesn't exist yet
+      }
+    }
+    // Now execute schema
     sqliteDb.exec(schemaSql);
   }
   console.log(`[Database] Initialized schema successfully using ${isPostgres ? 'PostgreSQL' : 'SQLite'}`);
