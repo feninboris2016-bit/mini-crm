@@ -165,4 +165,21 @@ export async function initDatabase(): Promise<void> {
     sqliteDb.exec(schemaSql);
   }
   console.log(`[Database] Initialized schema successfully using ${isPostgres ? 'PostgreSQL' : 'SQLite'}`);
+
+  // Auto-seed default admin user if users table is empty
+  try {
+    const userCountRow = await db.queryOne<{ count: string | number }>('SELECT COUNT(*) as count FROM users');
+    const count = Number(userCountRow?.count || 0);
+    if (count === 0) {
+      const { authService } = await import('../services/authService.js');
+      const { usersRepository } = await import('../repositories/usersRepository.js');
+      const adminEmail = process.env.INITIAL_ADMIN_EMAIL?.trim() || 'admin@crm.local';
+      const adminPass = process.env.INITIAL_ADMIN_PASSWORD?.trim() || 'admin12345';
+      const hash = await authService.hashPassword(adminPass);
+      await usersRepository.create(adminEmail, hash, 'admin');
+      console.log(`[Database] Automatically seeded initial administrator: ${adminEmail}`);
+    }
+  } catch (seedErr) {
+    console.warn('[Database] Initial admin seed warning:', seedErr);
+  }
 }

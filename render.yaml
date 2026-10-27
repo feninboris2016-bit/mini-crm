@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: tristar-mini-crm
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SITE_API_KEY
+        value: tristar_site_api_key_2026
+      - key: ALLOWED_ORIGIN
+        value: "*"
+      - key: INITIAL_ADMIN_EMAIL
+        value: admin@crm.local
+      - key: INITIAL_ADMIN_PASSWORD
+        value: admin12345
+      - key: DATABASE_URL
+        sync: false
